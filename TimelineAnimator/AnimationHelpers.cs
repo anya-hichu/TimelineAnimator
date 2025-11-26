@@ -15,54 +15,68 @@ public static class AnimationHelpers
         var keyframes = animation.GetKeyframes().Cast<MyKeyframe>().ToList();
         if (keyframes.Count == 0)
         {
-            // Return null preserve pose data
             return null;
         }
         MyKeyframe? kfB = keyframes.FirstOrDefault(k => k.Frame >= currentFrame);
         int kfB_Index = (kfB == null) ? -1 : keyframes.IndexOf(kfB);
+
         if (kfB == null)
         {
             return keyframes.Last().Transform;
         }
+
         if (kfB.Frame == currentFrame)
         {
             return kfB.Transform;
         }
 
-        BoneDto? startPoseDto;
+        Vector3 startPos;
+        Quaternion startRot;
+        Vector3 startScale;
         int startFrame;
 
         if (kfB_Index == 0)
         {
-            startPoseDto = GetDefaultBone(sequencer, animation.Name);
+            BoneDto? defaultBone = GetDefaultBone(sequencer, animation.Name);
+            if (defaultBone == null) return null;
+
+            startPos = new Vector3(defaultBone.Position.X, defaultBone.Position.Y, defaultBone.Position.Z);
+            startRot = new Quaternion(defaultBone.Rotation.X, defaultBone.Rotation.Y, defaultBone.Rotation.Z, defaultBone.Rotation.W);
+            startScale = new Vector3(defaultBone.Scale.X, defaultBone.Scale.Y, defaultBone.Scale.Z);
             startFrame = 0;
         }
         else
         {
             MyKeyframe kfA = keyframes[kfB_Index - 1];
-            startPoseDto = kfA.Transform;
+            startPos = kfA.Position;
+            startRot = kfA.Rotation;
+            startScale = kfA.Scale;
             startFrame = kfA.Frame;
         }
 
-        BoneDto? endPoseDto = kfB.Transform;
+        Vector3 endPos = kfB.Position;
+        Quaternion endRot = kfB.Rotation;
+        Vector3 endScale = kfB.Scale;
         int endFrame = kfB.Frame;
-
-        if (startPoseDto == null || endPoseDto == null) return null;
 
         float t = (float)(currentFrame - startFrame) / (float)(endFrame - startFrame);
         if (float.IsNaN(t) || float.IsInfinity(t)) t = 0;
 
         float easedT = GetEasedT(t, kfB);
 
+        Vector3 resPos = Vector3.Lerp(startPos, endPos, easedT);
+        Quaternion resRot = Quaternion.Slerp(startRot, endRot, easedT);
+        Vector3 resScale = Vector3.Lerp(startScale, endScale, easedT);
+
+        // Construct DTO
         return new BoneDto
         {
-            Position = Lerp(startPoseDto.Position, endPoseDto.Position, easedT),
-            Rotation = Slerp(startPoseDto.Rotation, endPoseDto.Rotation, easedT),
-            Scale = Lerp(startPoseDto.Scale, endPoseDto.Scale, easedT)
+            Position = new Vector3Dto { X = resPos.X, Y = resPos.Y, Z = resPos.Z },
+            Rotation = new QuaternionDto { X = resRot.X, Y = resRot.Y, Z = resRot.Z, W = resRot.W },
+            Scale = new Vector3Dto { X = resScale.X, Y = resScale.Y, Z = resScale.Z }
         };
     }
 
-    // default for single bone from actor base JSON
     private static BoneDto? GetDefaultBone(MyEditorWindow sequencer, string boneName)
     {
         if (string.IsNullOrEmpty(sequencer.DefaultPoseJson)) return null;
@@ -89,25 +103,5 @@ public static class AnimationHelpers
 
         float y = (3 * uu * t * kf.P1.Y) + (3 * u * tt * kf.P2.Y) + (tt * t);
         return y;
-    }
-
-    private static Vector3Dto Lerp(Vector3Dto a, Vector3Dto b, float t)
-    {
-        return new Vector3Dto
-        {
-            X = a.X + (b.X - a.X) * t,
-            Y = a.Y + (b.Y - a.Y) * t,
-            Z = a.Z + (b.Z - a.Z) * t
-        };
-    }
-
-    private static QuaternionDto Slerp(QuaternionDto a, QuaternionDto b, float t)
-    {
-        var qA = new Quaternion(a.X, a.Y, a.Z, a.W);
-        var qB = new Quaternion(b.X, b.Y, b.Z, b.W);
-
-        var resultQ = Quaternion.Slerp(qA, qB, t);
-
-        return new QuaternionDto { X = resultQ.X, Y = resultQ.Y, Z = resultQ.Z, W = resultQ.W };
     }
 }

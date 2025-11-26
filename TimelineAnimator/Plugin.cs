@@ -11,9 +11,6 @@ namespace TimelineAnimator;
 
 public sealed class Plugin : IDalamudPlugin
 {
-    // will move to global later
-
-
     private bool wasInGpose = false;
 
     private const string CommandName = "/animator";
@@ -53,7 +50,7 @@ public sealed class Plugin : IDalamudPlugin
 
         Services.CommandManager.AddHandler(CommandName, new CommandInfo(OnCommand)
         {
-            HelpMessage = "A useful message to display in /xlhelp"
+            HelpMessage = "Toggles the Main Window."
         });
 
 

@@ -17,19 +17,57 @@ namespace TimelineAnimator.ImSequencer
     public class MyKeyframe : IKeyframe
     {
         public int Frame { get; set; }
-        public BoneDto? Transform { get; set; }
+        // swapped to numerics
+        public Vector3 Position { get; set; }
+        public Quaternion Rotation { get; set; }
+        public Vector3 Scale { get; set; }
+
+        // helper to compat with BoneDto
+        public BoneDto? Transform
+        {
+            get
+            {
+                return new BoneDto
+                {
+                    Position = new Vector3Dto { X = Position.X, Y = Position.Y, Z = Position.Z },
+                    Rotation = new QuaternionDto { X = Rotation.X, Y = Rotation.Y, Z = Rotation.Z, W = Rotation.W },
+                    Scale = new Vector3Dto { X = Scale.X, Y = Scale.Y, Z = Scale.Z }
+                };
+            }
+            set
+            {
+                if (value != null)
+                {
+                    Position = new Vector3(value.Position.X, value.Position.Y, value.Position.Z);
+                    Rotation = new Quaternion(value.Rotation.X, value.Rotation.Y, value.Rotation.Z, value.Rotation.W);
+                    Scale = new Vector3(value.Scale.X, value.Scale.Y, value.Scale.Z);
+                }
+            }
+        }
+
         public Vector2 P1 { get; set; }
         public Vector2 P2 { get; set; }
         public KeyframeShape Shape { get; set; }
         public uint? CustomColor { get; set; }
+
         public MyKeyframe(int frame, BoneDto? transform = null)
         {
             Frame = frame;
             P1 = new Vector2(0.25f, 0.25f);
             P2 = new Vector2(0.75f, 0.75f);
-            Transform = transform;
             Shape = KeyframeShape.Diamond;
             CustomColor = null;
+
+            if (transform != null)
+            {
+                Transform = transform;
+            }
+            else
+            {
+                Position = Vector3.Zero;
+                Rotation = Quaternion.Identity;
+                Scale = Vector3.One;
+            }
         }
     }
 

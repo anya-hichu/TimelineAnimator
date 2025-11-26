@@ -180,58 +180,12 @@ public class DebugWindow : Window, IDisposable
         {
             TestJsonRoundtrip();
         }
-        ImGui.SameLine();
-        if (ImGui.Button("Load Sample JSON"))
-        {
-            GenerateSampleJson();
-        }
 
         ImGui.Text("JSON Data:");
         ImGui.InputTextMultiline("##JsonTestBuffer", ref jsonTestBuffer, 1000000, new Vector2(-1, ImGui.GetContentRegionAvail().Y - 70));
 
         ImGui.Text("Result:");
         ImGui.TextWrapped(jsonTestResult);
-    }
-
-    private void GenerateSampleJson()
-    {
-        try
-        {
-            var samplePose = new KtisisPoseFile
-            {
-                FileExtension = ".pose",
-                TypeName = "Ktisis Pose",
-                Position = new Vector3Dto { X = 1, Y = 2, Z = 3 },
-                Rotation = new QuaternionDto { X = 0, Y = 0, Z = 0, W = 1, IsIdentity = true },
-                Bones = new Dictionary<string, BoneDto>
-                {
-                    ["n_root"] = new BoneDto
-                    {
-                        Position = new Vector3Dto { X = 0, Y = 0, Z = 0 },
-                        Rotation = new QuaternionDto { X = 0, Y = 0, Z = 0, W = 1 },
-                        Scale = new Vector3Dto { X = 1, Y = 1, Z = 1 }
-                    },
-                    ["n_hara"] = new BoneDto
-                    {
-                        Position = new Vector3Dto { X = 0.1f, Y = 0.2f, Z = 0.3f },
-                        Rotation = new QuaternionDto { X = 0, Y = 0, Z = 0, W = 1 },
-                        Scale = new Vector3Dto { X = 1, Y = 1, Z = 1 }
-                    }
-                },
-                FileVersion = 1
-            };
-
-            string unformattedJson = JsonSerializer.Serialize(samplePose, KtisisJsonContext.Default.KtisisPoseFile);
-
-            using var jsonDoc = JsonDocument.Parse(unformattedJson);
-            jsonTestBuffer = JsonSerializer.Serialize(jsonDoc.RootElement, new JsonSerializerOptions { WriteIndented = true });
-
-            jsonTestResult = "Successfully generated and serialized a sample pose file.";
-        }
-        catch (Exception e)
-        {
-            jsonTestResult = $"Error generating sample: {e.Message}";
-        }
     }
 
     private void TestJsonRoundtrip()
