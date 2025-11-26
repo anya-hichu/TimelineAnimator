@@ -10,7 +10,7 @@ namespace TimelineAnimator.Interop;
 
 public class KtisisIpc
 {
-    private readonly IPluginLog log = Plugin.Log;
+    private readonly IPluginLog log = Services.Log;
     public bool IsAvailable { get; private set; } = true;
 
     private readonly ICallGateSubscriber<(int, int)>? _getVersion;
@@ -26,7 +26,7 @@ public class KtisisIpc
     {
         try
         {
-            IDalamudPluginInterface pluginInterface = Plugin.PluginInterface;
+            IDalamudPluginInterface pluginInterface = Services.PluginInterface;
 
             _getVersion = pluginInterface.GetIpcSubscriber<(int, int)>("Ktisis.ApiVersion");
             _refreshActors = pluginInterface.GetIpcSubscriber<bool>("Ktisis.RefreshActors");

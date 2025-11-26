@@ -131,7 +131,7 @@ public class MainWindow : Window, IDisposable
     }
     private async void OnGetSelectedBones()
     {
-        if (!plugin.KtisisIpc.IsAvailable) { Plugin.Log.Error("Cannot get bones: Ktisis IPC is not available."); return; }
+        if (!plugin.KtisisIpc.IsAvailable) { Services.Log.Error("Cannot get bones: Ktisis IPC is not available."); return; }
 
         try
         {
@@ -189,7 +189,7 @@ public class MainWindow : Window, IDisposable
                                     }
                                     catch (Exception e)
                                     {
-                                        Plugin.Log.Error(e, $"Failed to deserialize pose or find bone {boneName}");
+                                        Services.Log.Error(e, $"Failed to deserialize pose or find bone {boneName}");
                                     }
                                 }
 
@@ -222,7 +222,7 @@ public class MainWindow : Window, IDisposable
         }
         catch (Exception e)
         {
-            Plugin.Log.Error(e, "Exception occurred within OnGetSelectedBones:");
+            Services.Log.Error(e, "Exception occurred within OnGetSelectedBones:");
         }
     }
 

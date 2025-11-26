@@ -12,6 +12,6 @@ public class Configuration : IPluginConfiguration
     public bool ShowTooltips { get; set; } = true;
     public void Save()
     {
-        Plugin.PluginInterface.SavePluginConfig(this);
+        Services.PluginInterface.SavePluginConfig(this);
     }
 }

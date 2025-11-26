@@ -75,7 +75,7 @@ public static class AnimationHelpers
         }
         catch (Exception e)
         {
-            Plugin.Log.Error(e, "Failed to get default bone pose from JSON.");
+            Services.Log.Error(e, "Failed to get default bone pose from JSON.");
             return null;
         }
     }

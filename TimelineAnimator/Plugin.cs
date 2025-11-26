@@ -12,11 +12,7 @@ namespace TimelineAnimator;
 public sealed class Plugin : IDalamudPlugin
 {
     // will move to global later
-    [PluginService] internal static IDalamudPluginInterface PluginInterface { get; private set; } = null!;
-    [PluginService] internal static ICommandManager CommandManager { get; private set; } = null!;
-    [PluginService] internal static IClientState ClientState { get; private set; } = null!;
-    [PluginService] internal static IPluginLog Log { get; private set; } = null!;
-    [PluginService] internal static IFramework Framework { get; private set; } = null!;
+
 
     private bool wasInGpose = false;
 
@@ -32,14 +28,15 @@ public sealed class Plugin : IDalamudPlugin
     private DebugWindow DebugWindow { get; init; }
     private TutorialWindow TutorialWindow { get; init; }
     private EasingWindow EasingWindow { get; init; }
-    public Plugin()
+    public Plugin(IDalamudPluginInterface pluginInterface)
     {
-        Configuration = PluginInterface.GetPluginConfig() as Configuration ?? new Configuration();
+        pluginInterface.Create<Services>();
+        Configuration = pluginInterface.GetPluginConfig() as Configuration ?? new Configuration();
 
         KtisisIpc = new KtisisIpc();
 
         ConfigWindow = new ConfigWindow(this);
-        MainWindow = new MainWindow(this, Framework);
+        MainWindow = new MainWindow(this, Services.Framework);
         TutorialWindow = new TutorialWindow(this);
         EasingWindow = new EasingWindow(this);
 
@@ -52,36 +49,36 @@ public sealed class Plugin : IDalamudPlugin
         DebugWindow = new DebugWindow(this);
         WindowSystem.AddWindow(DebugWindow);
 #endif
-        PluginInterface.UiBuilder.DisableGposeUiHide = true;
+        pluginInterface.UiBuilder.DisableGposeUiHide = true;
 
-        CommandManager.AddHandler(CommandName, new CommandInfo(OnCommand)
+        Services.CommandManager.AddHandler(CommandName, new CommandInfo(OnCommand)
         {
             HelpMessage = "A useful message to display in /xlhelp"
         });
 
 
 #if DEBUG
-        CommandManager.AddHandler(DebugCommandName, new CommandInfo(OnDebugCommand)
+        Services.CommandManager.AddHandler(DebugCommandName, new CommandInfo(OnDebugCommand)
         {
             HelpMessage = "Toggles the Ktisis IPC Debug Window"
         });
 #endif
-        PluginInterface.UiBuilder.Draw += WindowSystem.Draw;
-        PluginInterface.UiBuilder.OpenConfigUi += ToggleConfigUi;
-        PluginInterface.UiBuilder.OpenMainUi += ToggleMainUi;
+        pluginInterface.UiBuilder.Draw += WindowSystem.Draw;
+        pluginInterface.UiBuilder.OpenConfigUi += ToggleConfigUi;
+        pluginInterface.UiBuilder.OpenMainUi += ToggleMainUi;
 
-        Framework.Update += OnFrameworkUpdate;
+        Services.Framework.Update += OnFrameworkUpdate;
 
-        Log.Information($"{PluginInterface.Manifest.Name} Started up successfully!");
+        Services.Log.Information($"{pluginInterface.Manifest.Name} Started up successfully!");
     }
 
     public void Dispose()
     {
-        Framework.Update -= OnFrameworkUpdate;
+        Services.Framework.Update -= OnFrameworkUpdate;
 
-        PluginInterface.UiBuilder.Draw -= WindowSystem.Draw;
-        PluginInterface.UiBuilder.OpenConfigUi -= ToggleConfigUi;
-        PluginInterface.UiBuilder.OpenMainUi -= ToggleMainUi;
+        Services.PluginInterface.UiBuilder.Draw -= WindowSystem.Draw;
+        Services.PluginInterface.UiBuilder.OpenConfigUi -= ToggleConfigUi;
+        Services.PluginInterface.UiBuilder.OpenMainUi -= ToggleMainUi;
 
         WindowSystem.RemoveAllWindows();
 
@@ -93,15 +90,15 @@ public sealed class Plugin : IDalamudPlugin
 #endif
         EasingWindow.Dispose();
         TutorialWindow.Dispose();
-        CommandManager.RemoveHandler(CommandName);
+        Services.CommandManager.RemoveHandler(CommandName);
 #if DEBUG
-        CommandManager.RemoveHandler(DebugCommandName);
+        Services.CommandManager.RemoveHandler(DebugCommandName);
 #endif
     }
 
     private void OnFrameworkUpdate(IFramework framework)
     {
-        bool currentlyInGpose = ClientState.IsGPosing;
+        bool currentlyInGpose = Services.ClientState.IsGPosing;
         if (currentlyInGpose != wasInGpose)
         {
             if (currentlyInGpose)
