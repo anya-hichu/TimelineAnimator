@@ -2,41 +2,22 @@ using Dalamud.Bindings.ImGui;
 using Dalamud.Interface;
 using Dalamud.Interface.Components;
 using Dalamud.Interface.Windowing;
-using Dalamud.Plugin.Services;
-using TimelineAnimator.Format;
 using TimelineAnimator.ImSequencer;
 using System;
-using System.Collections.Generic;
-using System.Linq;
 using System.Numerics;
-using System.Text.Json;
-using YourPlugin.Serialization;
 
 namespace TimelineAnimator.Windows;
 
 public class MainWindow : Window, IDisposable
 {
     private readonly Plugin plugin;
-    private readonly IFramework framework;
-
-    private readonly List<MyEditorWindow> sequencers = new();
-
-    private int sharedCurrentFrame = 0;
-    private bool isPlaying = false;
-    private int sharedSelectedEntry = -1;
-    private int activeSequencerTab = -1;
-    private int lastAppliedFrame = -1;
-    
-
-    private const double PlaybackFramesPerSecond = 30.0;
-    private double timeAccumulator = 0.0;
-
+    private readonly TimelineManager timeline;
     private bool inspectorVisible = true;
     private float inspectorWidth = 200f;
 
     private readonly string[] keyframeShapeNames = Enum.GetNames(typeof(KeyframeShape));
 
-    public MainWindow(Plugin plugin, IFramework framework)
+    public MainWindow(Plugin plugin, TimelineManager timelineManager)
         : base("Timeline Animator##SequencerMain")
     {
         SizeConstraints = new WindowSizeConstraints
@@ -45,186 +26,10 @@ public class MainWindow : Window, IDisposable
             MaximumSize = new Vector2(float.MaxValue, float.MaxValue)
         };
         this.plugin = plugin;
-        this.framework = framework;
+        this.timeline = timelineManager;
     }
 
     public void Dispose() { }
-    private int GetGlobalMinFrame()
-    {
-        if (sequencers.Count == 0) return 0;
-        return sequencers.Min(s => s.GetMinFrame());
-    }
-
-    private int GetGlobalMaxFrame()
-    {
-        if (sequencers.Count == 0) return 100;
-        return sequencers.Max(s => s.GetMaxFrame());
-    }
-    public void UpdateAnimation(IFramework fw)
-    {
-        if (!isPlaying || PlaybackFramesPerSecond <= 0) { timeAccumulator = 0.0; return; }
-        if (sequencers.Count == 0) return;
-
-        timeAccumulator += fw.UpdateDelta.TotalSeconds;
-        double frameDuration = 1.0 / PlaybackFramesPerSecond;
-        if (frameDuration <= 0) { timeAccumulator = 0.0; return; }
-
-        int maxFrame = GetGlobalMaxFrame();
-        int minFrame = GetGlobalMinFrame();
-
-        bool frameAdvanced = false;
-        while (timeAccumulator >= frameDuration)
-        {
-            sharedCurrentFrame++;
-            timeAccumulator -= frameDuration;
-            if (sharedCurrentFrame > maxFrame) { sharedCurrentFrame = minFrame; }
-            frameAdvanced = true;
-        }
-
-        if (frameAdvanced)
-        {
-            ApplyPoseToAllSequencers(sharedCurrentFrame);
-        }
-    }
-
-    private void ApplyPoseToAllSequencers(int frame)
-    {
-        if (lastAppliedFrame == frame) return;
-
-        if (sequencers.Count == 0)
-        {
-            lastAppliedFrame = frame;
-            return;
-        }
-
-        foreach (var sequencer in sequencers)
-        {
-            var poseFile = new KtisisPoseFile
-            {
-                Bones = new Dictionary<string, BoneDto>()
-            };
-
-            foreach (var animation in sequencer.GetAnimations())
-            {
-                var boneDto = AnimationHelpers.GetInterpolatedBone(sequencer, animation, frame);
-                if (boneDto != null)
-                {
-                    poseFile.Bones[animation.Name] = boneDto;
-                }
-            }
-
-            if (poseFile.Bones.Count > 0)
-            {
-                string newPoseJson = JsonSerializer.Serialize(poseFile, KtisisJsonContext.Default.KtisisPoseFile);
-                _ = plugin.KtisisIpc.LoadPoseAsync(sequencer.ActorIndex, newPoseJson);
-            }
-            else
-            {
-                if (sequencer.DefaultPoseJson != null)
-                {
-                    _ = plugin.KtisisIpc.LoadPoseAsync(sequencer.ActorIndex, sequencer.DefaultPoseJson);
-                }
-            }
-        }
-
-        lastAppliedFrame = frame;
-    }
-    private async void OnGetSelectedBones()
-    {
-        if (!plugin.KtisisIpc.IsAvailable) { Services.Log.Error("Cannot get bones: Ktisis IPC is not available."); return; }
-
-        try
-        {
-            var selectedBonesByActor = await plugin.KtisisIpc.GetSelectedBonesAsync();
-
-            if (selectedBonesByActor == null || selectedBonesByActor.Count == 0) { return; }
-
-            foreach (var (actorIndex, boneNames) in selectedBonesByActor)
-            {
-                if (boneNames == null || boneNames.Count == 0) { continue; }
-
-                var existingSequencer = sequencers.FirstOrDefault(s => s.ActorIndex == actorIndex);
-
-                if (existingSequencer == null)
-                {
-                    int currentGlobalMax = GetGlobalMaxFrame();
-
-                    string? defaultPoseJson = await plugin.KtisisIpc.SavePoseAsync((uint)actorIndex);
-                    string actorName = $"Actor {actorIndex}";
-                    var newSequencer = new MyEditorWindow(actorName, (uint)actorIndex, defaultPoseJson);
-
-                    newSequencer.SetMaxFrame(currentGlobalMax);
-
-                    foreach (var boneName in boneNames.OrderBy(b => b))
-                    {
-                        newSequencer.AddTrack(boneName);
-                    }
-                    sequencers.Add(newSequencer);
-                }
-                else
-                {
-                    foreach (var boneName in boneNames.OrderBy(b => b))
-                    {
-                        if (!existingSequencer.HasTrack(boneName))
-                        {
-                            existingSequencer.AddTrack(boneName);
-                        }
-                        else
-                        {
-                            var animation = existingSequencer.GetAnimationByName(boneName);
-                            if (animation != null)
-                            {
-                                var existingKeyframe = animation.GetKeyframes().Cast<MyKeyframe>()
-                                                             .FirstOrDefault(k => k.Frame == sharedCurrentFrame);
-
-                                string? fullPoseJson = await plugin.KtisisIpc.SavePoseAsync(existingSequencer.ActorIndex);
-                                BoneDto? boneTransform = null;
-
-                                if (fullPoseJson != null)
-                                {
-                                    try
-                                    {
-                                        var poseFile = JsonSerializer.Deserialize(fullPoseJson, KtisisJsonContext.Default.KtisisPoseFile);
-                                        poseFile?.Bones.TryGetValue(boneName, out boneTransform);
-                                    }
-                                    catch (Exception e)
-                                    {
-                                        Services.Log.Error(e, $"Failed to deserialize pose or find bone {boneName}");
-                                    }
-                                }
-
-                                if (existingKeyframe == null)
-                                {
-                                    animation.AddKeyframe(sharedCurrentFrame, boneTransform);
-                                }
-                                else
-                                {
-                                    existingKeyframe.Transform = boneTransform;
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-
-            if (sequencers.Count > 0 && activeSequencerTab < 0)
-            {
-                activeSequencerTab = sequencers.Count - 1;
-            }
-            else if (sequencers.Count > 0 && activeSequencerTab >= sequencers.Count)
-            {
-                activeSequencerTab = 0;
-            }
-            else if (sequencers.Count == 0)
-            {
-                activeSequencerTab = -1;
-            }
-        }
-        catch (Exception e)
-        {
-            Services.Log.Error(e, "Exception occurred within OnGetSelectedBones:");
-        }
-    }
 
     public override void Draw()
     {
@@ -235,7 +40,7 @@ public class MainWindow : Window, IDisposable
 
         if (ImGuiComponents.IconButton(FontAwesomeIcon.PlusCircle))
         {
-            OnGetSelectedBones();
+            timeline.FetchSelectedBones();
         }
         if (plugin.Configuration.ShowTooltips && ImGui.IsItemHovered())
         {
@@ -247,7 +52,11 @@ public class MainWindow : Window, IDisposable
         ImGui.SameLine();
         ImGui.SetCursorPosX(middlePosX);
 
-        if (ImGuiComponents.IconButton(isPlaying ? FontAwesomeIcon.PauseCircle : FontAwesomeIcon.PlayCircle)) { isPlaying = !isPlaying; if (!isPlaying) timeAccumulator = 0.0; }
+        var icon = timeline.IsPlaying ? FontAwesomeIcon.PauseCircle : FontAwesomeIcon.PlayCircle;
+        if (ImGuiComponents.IconButton(icon))
+        {
+            timeline.TogglePlay();
+        }
         if (plugin.Configuration.ShowTooltips && ImGui.IsItemHovered())
         {
             ImGui.SetTooltip("Start / Pause Playback.");
@@ -255,17 +64,14 @@ public class MainWindow : Window, IDisposable
         ImGui.SameLine();
         if (ImGuiComponents.IconButton(FontAwesomeIcon.StopCircle))
         {
-            isPlaying = false;
-            sharedCurrentFrame = GetGlobalMinFrame();
-            timeAccumulator = 0.0;
-            lastAppliedFrame = -1;
-            ApplyPoseToAllSequencers(sharedCurrentFrame);
+            timeline.Stop();
         }
         if (plugin.Configuration.ShowTooltips && ImGui.IsItemHovered())
         {
             ImGui.SetTooltip("Stop Playback.");
         }
-        float rightContentWidth = (itemHeight * 1); //+ (itemSpacing * 2)
+
+        float rightContentWidth = (itemHeight * 1);
         float rightPosX = contentWidth - rightContentWidth;
         ImGui.SameLine();
         ImGui.SetCursorPosX(rightPosX);
@@ -290,53 +96,61 @@ public class MainWindow : Window, IDisposable
 
         if (ImGui.BeginTabBar("SequencerTabs", ImGuiTabBarFlags.Reorderable))
         {
-            int previousActiveTab = activeSequencerTab;
+            int previousActiveTab = timeline.ActiveSequencerIndex;
 
-            for (int i = sequencers.Count - 1; i >= 0; i--)
+            for (int i = timeline.Sequencers.Count - 1; i >= 0; i--)
             {
-                if (!sequencers[i].IsVisible)
+                if (!timeline.Sequencers[i].IsVisible)
                 {
-                    if (activeSequencerTab == i)
+                    if (timeline.ActiveSequencerIndex == i)
                     {
-                        activeSequencerTab = -1;
-                        sharedSelectedEntry = -1;
+                        timeline.ActiveSequencerIndex = -1;
+                        timeline.SharedSelectedEntry = -1;
                     }
-                    sequencers.RemoveAt(i);
+                    timeline.Sequencers.RemoveAt(i);
                 }
             }
 
-            for (int i = 0; i < sequencers.Count; i++)
+            for (int i = 0; i < timeline.Sequencers.Count; i++)
             {
-                var sequencer = sequencers[i];
-                if (ImGui.BeginTabItem($"{sequencer.SequencerName}##{sequencer.ActorIndex}", ref sequencer.IsVisible, ImGuiTabItemFlags.None))
+                var sequencer = timeline.Sequencers[i];
+                bool isOpen = sequencer.IsVisible;
+                if (ImGui.BeginTabItem($"{sequencer.SequencerName}##{sequencer.ActorIndex}", ref isOpen, ImGuiTabItemFlags.None))
                 {
-                    activeSequencerTab = i;
-                    sequencer.Draw(ref sharedCurrentFrame, ref sharedSelectedEntry);
+                    timeline.ActiveSequencerIndex = i;
+
+                    int currentFrame = timeline.CurrentFrame;
+                    int selectedEntry = timeline.SharedSelectedEntry;
+
+                    sequencer.Draw(ref currentFrame, ref selectedEntry);
+
+                    timeline.CurrentFrame = currentFrame;
+                    timeline.SharedSelectedEntry = selectedEntry;
+
                     ImGui.EndTabItem();
                 }
+                sequencer.IsVisible = isOpen;
             }
 
-            if (activeSequencerTab != previousActiveTab)
+            if (timeline.ActiveSequencerIndex != previousActiveTab)
             {
-                sharedSelectedEntry = -1;
-                lastAppliedFrame = -1;
+                timeline.SharedSelectedEntry = -1;
             }
-            if (activeSequencerTab >= sequencers.Count)
+            if (timeline.ActiveSequencerIndex >= timeline.Sequencers.Count)
             {
-                activeSequencerTab = sequencers.Count - 1;
+                timeline.ActiveSequencerIndex = timeline.Sequencers.Count - 1;
             }
-            if (activeSequencerTab < 0 && sequencers.Count > 0)
+            if (timeline.ActiveSequencerIndex < 0 && timeline.Sequencers.Count > 0)
             {
-                activeSequencerTab = 0;
+                timeline.ActiveSequencerIndex = 0;
             }
 
             ImGui.EndTabBar();
         }
-        if (!isPlaying)
+        if (!timeline.IsPlaying)
         {
-            ApplyPoseToAllSequencers(sharedCurrentFrame);
+            timeline.ApplyCurrentPose();
         }
-
         ImGui.EndChild();
 
         ImGui.SameLine();
@@ -347,25 +161,27 @@ public class MainWindow : Window, IDisposable
         {
             inspectorVisible = !inspectorVisible;
         }
+
         if (inspectorVisible)
         {
             ImGui.SameLine();
             ImGui.BeginChild("InspectorPanel", new Vector2(inspectorWidth, availableHeight), true);
-
             ImGui.PushItemWidth(ImGui.GetContentRegionAvail().X);
             DrawInspectorContents();
             ImGui.PopItemWidth();
-
             ImGui.EndChild();
         }
     }
+
     private void DrawInspectorContents()
     {
         ImGui.Text("Inspector");
         ImGui.Separator();
         ImGui.Spacing();
 
-        if (sequencers.Count == 0 || activeSequencerTab < 0 || activeSequencerTab >= sequencers.Count)
+        MyEditorWindow? activeSequencer = timeline.GetActiveSequencer();
+
+        if (activeSequencer == null)
         {
             ImGui.Text("No actor selected.");
             ImGui.TextDisabled("Click the 'Get Ktisis Actors' button");
@@ -375,33 +191,30 @@ public class MainWindow : Window, IDisposable
             return;
         }
 
-        MyEditorWindow activeSequencer = sequencers[activeSequencerTab];
         int selectedKeyframeIndex = activeSequencer.GetSelectedKeyframeIndex();
-        bool isKeyframeSelected = sharedSelectedEntry != -1 && selectedKeyframeIndex != -1;
+        bool isKeyframeSelected = timeline.SharedSelectedEntry != -1 && selectedKeyframeIndex != -1;
 
         if (!isKeyframeSelected)
         {
             ImGui.Text("Play Range");
-            int frameMax = GetGlobalMaxFrame();
+            int frameMax = timeline.GetGlobalMaxFrame();
+            int minFrames = timeline.GetGlobalMinFrame() + 1;
 
-            int minFrames = GetGlobalMinFrame() + 1;
             if (ImGui.DragInt("Max Frames##PlayRange", ref frameMax, 1.0f, minFrames, 10000))
             {
-                foreach (var sequencer in sequencers)
-                {
-                    sequencer.SetMaxFrame(frameMax);
-                }
+                timeline.SetMaxFrameForAll(frameMax);
             }
             plugin.UpdateEasingUiKeyframe(null);
         }
         else
         {
-            var keyframe = activeSequencer.GetSelectedKeyframe(sharedSelectedEntry, selectedKeyframeIndex) as MyKeyframe;
-            var anim = activeSequencer.GetAnimation(sharedSelectedEntry);
+            var keyframe = activeSequencer.GetSelectedKeyframe(timeline.SharedSelectedEntry, selectedKeyframeIndex) as MyKeyframe;
+            var anim = activeSequencer.GetAnimation(timeline.SharedSelectedEntry);
             var io = ImGui.GetIO();
+
             plugin.UpdateEasingUiKeyframe(keyframe);
 
-            ImGui.Text($"Track {sharedSelectedEntry + 1} Selected");
+            ImGui.Text($"Track {timeline.SharedSelectedEntry + 1} Selected");
             if (anim != null)
             {
                 ImGui.Text($"Bone: {anim.Name}");
@@ -423,11 +236,9 @@ public class MainWindow : Window, IDisposable
                 plugin.OpenEasingUiForKeyframe(keyframe);
             }
             ImGui.Spacing();
+
             bool isShiftDown = io.KeyShift;
-            if (!isShiftDown)
-            {
-                ImGui.BeginDisabled();
-            }
+            if (!isShiftDown) ImGui.BeginDisabled();
 
             if (ImGui.Button("Delete Keyframe"))
             {
@@ -435,7 +246,7 @@ public class MainWindow : Window, IDisposable
                 {
                     anim.DeleteKeyframe(selectedKeyframeIndex);
                     activeSequencer.ClearSelectedKeyframe();
-                    sharedSelectedEntry = -1;
+                    timeline.SharedSelectedEntry = -1;
                 }
             }
 
@@ -459,20 +270,13 @@ public class MainWindow : Window, IDisposable
                 bool useCustomColor = keyframe.CustomColor.HasValue;
                 if (ImGui.Checkbox("Custom Color", ref useCustomColor))
                 {
-                    if (useCustomColor)
-                    {
-                        keyframe.CustomColor = 0xFFFFFFFF;
-                    }
-                    else
-                    {
-                        keyframe.CustomColor = null;
-                    }
+                    keyframe.CustomColor = useCustomColor ? 0xFFFFFFFF : null;
                 }
 
                 ImGui.SameLine();
-                if (useCustomColor)
+                if (keyframe.CustomColor.HasValue)
                 {
-                    uint abgr = keyframe.CustomColor ?? 0xFFFFFFFF;
+                    uint abgr = keyframe.CustomColor.Value;
                     Vector4 rgba = new(
                         ((abgr >> 0) & 0xFF) / 255.0f,
                         ((abgr >> 8) & 0xFF) / 255.0f,

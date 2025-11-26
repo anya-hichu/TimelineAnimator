@@ -8,7 +8,7 @@ using System.Threading.Tasks;
 using System.Collections.Generic;
 using System.Text.Json;
 using TimelineAnimator.Format;
-using YourPlugin.Serialization;
+using TimelineAnimator.Serialization;
 
 namespace TimelineAnimator.Windows;
 

@@ -1,7 +1,7 @@
 ﻿using System.Text.Json.Serialization;
 using TimelineAnimator.Format;
 
-namespace YourPlugin.Serialization;
+namespace TimelineAnimator.Serialization;
 
 [JsonSourceGenerationOptions(
     WriteIndented = false,

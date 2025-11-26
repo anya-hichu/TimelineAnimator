@@ -3,7 +3,7 @@ using TimelineAnimator.ImSequencer;
 using System.Linq;
 using System.Numerics;
 using System.Text.Json;
-using YourPlugin.Serialization;
+using TimelineAnimator.Serialization;
 using System;
 
 namespace TimelineAnimator;

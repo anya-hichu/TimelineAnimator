@@ -25,15 +25,17 @@ public sealed class Plugin : IDalamudPlugin
     private DebugWindow DebugWindow { get; init; }
     private TutorialWindow TutorialWindow { get; init; }
     private EasingWindow EasingWindow { get; init; }
+    public TimelineManager TimelineManager { get; init; }
     public Plugin(IDalamudPluginInterface pluginInterface)
     {
         pluginInterface.Create<Services>();
         Configuration = pluginInterface.GetPluginConfig() as Configuration ?? new Configuration();
 
         KtisisIpc = new KtisisIpc();
+        TimelineManager = new TimelineManager(KtisisIpc);
 
         ConfigWindow = new ConfigWindow(this);
-        MainWindow = new MainWindow(this, Services.Framework);
+        MainWindow = new MainWindow(this, TimelineManager);
         TutorialWindow = new TutorialWindow(this);
         EasingWindow = new EasingWindow(this);
 
@@ -105,9 +107,9 @@ public sealed class Plugin : IDalamudPlugin
 
             wasInGpose = currentlyInGpose;
         }
-
-        MainWindow.UpdateAnimation(framework);
+        TimelineManager.Update((float)framework.UpdateDelta.TotalSeconds);
     }
+
     private void OnEnterGpose()
     {
         if (Configuration.OpenInGpose)
