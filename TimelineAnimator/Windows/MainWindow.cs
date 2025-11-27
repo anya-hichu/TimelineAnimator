@@ -298,6 +298,32 @@ public class MainWindow : Window, IDisposable
                     }
                 }
             }
+            ImGui.Spacing();
+            ImGui.Separator();
+            ImGui.Spacing();
+
+            if (anim != null)
+            {
+                ImGui.TextDisabled($"Track: {anim.DisplayName}");
+
+                if (!isShiftDown) ImGui.BeginDisabled();
+
+                if (ImGui.Button("Delete Track"))
+                {
+                    activeSequencer.RemoveTrack(timeline.SharedSelectedEntry);
+                    timeline.SharedSelectedEntry = -1;
+                    activeSequencer.ClearSelectedKeyframe();
+                }
+
+                if (!isShiftDown)
+                {
+                    ImGui.EndDisabled();
+                    if (plugin.Configuration.ShowTooltips && ImGui.IsItemHovered(ImGuiHoveredFlags.AllowWhenDisabled))
+                    {
+                        ImGui.SetTooltip("Hold SHIFT to delete the entire track");
+                    }
+                }
+            }
         }
     }
 }

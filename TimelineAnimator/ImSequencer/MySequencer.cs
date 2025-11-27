@@ -17,7 +17,6 @@ namespace TimelineAnimator.ImSequencer
     public class MyKeyframe : IKeyframe
     {
         public int Frame { get; set; }
-        // swapped to numerics
         public Vector3 Position { get; set; }
         public Quaternion Rotation { get; set; }
         public Vector3 Scale { get; set; }
@@ -220,7 +219,10 @@ namespace TimelineAnimator.ImSequencer
         {
             mySequencer.AddAnimation(trackName);
         }
-
+        public void RemoveTrack(int index)
+        {
+            mySequencer.RemoveAnimation(index);
+        }
         public bool HasTrack(string trackName)
         {
             return mySequencer.Animations.Any(anim => anim.Name == trackName);
