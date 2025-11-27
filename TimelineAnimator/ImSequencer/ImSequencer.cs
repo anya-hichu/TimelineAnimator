@@ -395,7 +395,18 @@ namespace TimelineAnimator.ImSequencer
                         {
                             if (ImGui.MenuItem($"Delete###deleteEntry{i}Keyframe{k}", false, io.KeyShift))
                             {
-                                animation.DeleteKeyframe(k);
+                                if (state.SelectedKeyframes.Count > 0)
+                                {
+                                    foreach (var selectedKeyframe in state.SelectedKeyframes)
+                                    {
+                                        sequence.GetAnimation(selectedKeyframe.trackIndex).DeleteKeyframe(selectedKeyframe.keyframeIndex);
+                                    }
+                                }
+                                else
+                                {
+                                    animation.DeleteKeyframe(k);
+                                }
+                                state.SelectedKeyframes.Clear();
                                 ImGui.CloseCurrentPopup();
                             }
                             if (ImGui.IsItemHovered(ImGuiHoveredFlags.AllowWhenDisabled)) ImGui.SetTooltip("Hold SHIFT to delete");
