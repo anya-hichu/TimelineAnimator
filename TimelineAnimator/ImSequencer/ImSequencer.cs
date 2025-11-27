@@ -27,19 +27,31 @@
 using Dalamud.Bindings.ImGui;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Numerics;
 
 namespace TimelineAnimator.ImSequencer
 {
+    public struct SelectedKeyframe
+    {
+        public int trackIndex;
+        public int keyframeIndex;
+        public SelectedKeyframe(int trackIndex, int keyframeIndex)
+        {
+            this.trackIndex = trackIndex;
+            this.keyframeIndex = keyframeIndex;
+        }
+    }
+
     public class ImSequencerState
     {
         public float framePixelWidth = 10f;
         public float framePixelWidthTarget = 10f;
-        public int movingEntry = -1;
-        public int movingPos = -1;
-        public int movingKeyframeIndex = -1;
-        public bool MovingCurrentFrame = false;
+        public HashSet<SelectedKeyframe> SelectedKeyframes = new();
 
+        public bool MovingCurrentFrame = false;
+        public int movingPos = -1;
+        public bool IsDragging = false;
 
         public ZoomScrollbar.State ZoomState = new();
     }
@@ -168,13 +180,18 @@ namespace TimelineAnimator.ImSequencer
 
             draw_list.AddRectFilled(canvas_pos, canvas_pos + canvas_size, ImGui.GetColorU32(Color_Widget_Background), 0f);
 
+            //playhead
             var topRect = new ImRect(new Vector2(canvas_pos.X + legendWidth, canvas_pos.Y), new Vector2(canvas_pos.X + canvas_size.X, canvas_pos.Y + ItemHeight));
-            if (state.movingEntry == -1 && currentFrame >= 0 && topRect.Contains(io.MousePos) && io.MouseDown[0])
+            if (!state.IsDragging && currentFrame >= 0 && topRect.Contains(io.MousePos) && io.MouseDown[0])
             {
                 state.MovingCurrentFrame = true;
             }
             if (state.MovingCurrentFrame)
             {
+                if (state.SelectedKeyframes.Count > 0)
+                {
+                    state.SelectedKeyframes.Clear();
+                }
                 currentFrame = (int)((io.MousePos.X - topRect.Min.X) / state.framePixelWidth) + firstFrameUsed;
                 currentFrame = Math.Clamp(currentFrame, sequence.FrameMin, sequence.FrameMax);
                 if (!io.MouseDown[0])
@@ -340,9 +357,9 @@ namespace TimelineAnimator.ImSequencer
                     float y = pos.Y + (ItemHeight / 2);
                     float size = 6f;
                     var keyframeRect = new ImRect(new Vector2(keyframeX - size, y - size), new Vector2(keyframeX + size, y + size));
-                    
+
                     bool isHovered = keyframeRect.Contains(io.MousePos);
-                    bool isSelected = i == selectedEntry && k == state.movingKeyframeIndex;
+                    bool isSelected = state.SelectedKeyframes.Contains(new SelectedKeyframe(i, k));
 
                     uint baseColor = keyframe.CustomColor ?? ImGui.GetColorU32(Color_Keyframe_Default);
                     uint drawColor = isSelected ? ImGui.GetColorU32(Color_Keyframe_Selected) :
@@ -370,17 +387,37 @@ namespace TimelineAnimator.ImSequencer
                         }
                     }
 
-                    if (state.movingEntry == -1 && ImGui.IsMouseClicked(0) && isHovered)
+                    if (!state.IsDragging && ImGui.IsMouseClicked(0) && isHovered)
                     {
                         if (!new ImRect(contentClipRectMin, contentClipRectMax).Contains(io.MousePos))
                             continue;
+
                         if (!state.MovingCurrentFrame)
                         {
-                            state.movingEntry = i;
-                            state.movingKeyframeIndex = k;
+                            bool isMultiSelect = io.KeyCtrl;
+
+                            if (isMultiSelect)
+                            {
+                                var sk = new SelectedKeyframe(i, k);
+                                if (state.SelectedKeyframes.Contains(sk))
+                                    state.SelectedKeyframes.Remove(sk);
+                                else
+                                    state.SelectedKeyframes.Add(sk);
+                            }
+                            else
+                            {
+                                if (!isSelected)
+                                {
+                                    state.SelectedKeyframes.Clear();
+                                    state.SelectedKeyframes.Add(new SelectedKeyframe(i, k));
+                                }
+                            }
+
+                            state.IsDragging = true;
                             state.movingPos = cx;
-                            sequence.BeginEdit(state.movingEntry);
+                            sequence.BeginEdit(i);
                             clickedOnKeyframe = true;
+                            selectedEntry = i;
                         }
                     }
                 }
@@ -404,56 +441,75 @@ namespace TimelineAnimator.ImSequencer
                 customHeight += localCustomHeight;
             }
 
-            if (clickedOnTrackArea && !clickedOnKeyframe && state.movingEntry == -1 && !state.MovingCurrentFrame)
+            if (clickedOnTrackArea && !clickedOnKeyframe && !state.IsDragging && !state.MovingCurrentFrame)
             {
                 if (hoveredEntry >= 0)
                 {
                     selectedEntry = hoveredEntry;
-                    state.movingKeyframeIndex = -1;
+                    state.SelectedKeyframes.Clear();
                 }
                 else
                 {
                     selectedEntry = -1;
-                    state.movingKeyframeIndex = -1;
+                    state.SelectedKeyframes.Clear();
                 }
             }
-
-            if (state.movingEntry >= 0)
+            if (state.IsDragging)
             {
                 ImGui.SetNextFrameWantCaptureMouse(true);
                 var diffX = cx - state.movingPos;
-                if (state.movingKeyframeIndex != -1)
+                var potentialDiffFrame = (int)Math.Round((double)diffX / state.framePixelWidth);
+
+                if (Math.Abs(potentialDiffFrame) > 0)
                 {
-                    var animation = sequence.GetAnimation(state.movingEntry);
-                    var keyframe = animation.GetKeyframe(state.movingKeyframeIndex);
-                    var potentialDiffFrame = (int)Math.Round((double)diffX / state.framePixelWidth);
-
-                    if (Math.Abs(potentialDiffFrame) > 0)
+                    bool canMove = true;
+                    foreach (var sk in state.SelectedKeyframes)
                     {
-                        int originalFrame = keyframe.Frame;
-                        int newFrameUnclamped = originalFrame + potentialDiffFrame;
-                        int newFrameClamped = Math.Clamp(newFrameUnclamped, sequence.FrameMin, sequence.FrameMax);
+                        var anim = sequence.GetAnimation(sk.trackIndex);
+                        if (anim == null) continue;
+                        var key = anim.GetKeyframe(sk.keyframeIndex);
+                        if (key == null) continue;
 
-                        if (originalFrame != newFrameClamped)
+                        int newFrame = key.Frame + potentialDiffFrame;
+                        if (newFrame < sequence.FrameMin || newFrame > sequence.FrameMax)
                         {
-                            keyframe.Frame = newFrameClamped;
-                            selectedEntry = state.movingEntry;
-                            ret = true;
+                            canMove = false;
+                            break;
                         }
-                        int actualDiffFrame = newFrameClamped - originalFrame;
-                        state.movingPos += (int)Math.Round(actualDiffFrame * state.framePixelWidth);
                     }
-                }
-                if (!io.MouseDown[0])
-                {
-                    if (state.movingKeyframeIndex != -1)
+
+                    if (canMove)
                     {
-                        var animation = sequence.GetAnimation(state.movingEntry);
-                        if (animation is MyAnimation myAnim) { myAnim.Keyframes.Sort((a, b) => a.Frame.CompareTo(b.Frame)); }
-                        selectedEntry = state.movingEntry;
+                        foreach (var sk in state.SelectedKeyframes)
+                        {
+                            var anim = sequence.GetAnimation(sk.trackIndex);
+                            if (anim == null) continue;
+                            var key = anim.GetKeyframe(sk.keyframeIndex);
+                            if (key != null)
+                            {
+                                key.Frame += potentialDiffFrame;
+                            }
+                        }
+                        state.movingPos += (int)Math.Round(potentialDiffFrame * state.framePixelWidth);
                         ret = true;
                     }
-                    state.movingEntry = -1;
+                }
+
+                if (!io.MouseDown[0])
+                {
+                    var affectedTracks = state.SelectedKeyframes.Select(x => x.trackIndex).Distinct();
+                    foreach (var trackIdx in affectedTracks)
+                    {
+                        var anim = sequence.GetAnimation(trackIdx);
+                        if (anim is MyAnimation myAnim)
+                        {
+                            myAnim.Keyframes.Sort((a, b) => a.Frame.CompareTo(b.Frame));
+                        }
+                    }
+
+                    RebuildSelectionIndices(state, sequence);
+
+                    state.IsDragging = false;
                     sequence.EndEdit();
                 }
             }
@@ -501,6 +557,36 @@ namespace TimelineAnimator.ImSequencer
             ImGui.EndGroup();
 
             return ret;
+        }
+
+        private void RebuildSelectionIndices(ImSequencerState state, SequenceInterface sequence)
+        {
+            var selectedObjects = new List<(int TrackIdx, IKeyframe Keyframe)>();
+            foreach (var sk in state.SelectedKeyframes)
+            {
+                var anim = sequence.GetAnimation(sk.trackIndex);
+                if (anim == null) continue;
+                if (sk.keyframeIndex >= 0 && sk.keyframeIndex < anim.GetKeyframeCount())
+                {
+                    selectedObjects.Add((sk.trackIndex, anim.GetKeyframe(sk.keyframeIndex)));
+                }
+            }
+
+            state.SelectedKeyframes.Clear();
+
+            foreach (var item in selectedObjects)
+            {
+                var anim = sequence.GetAnimation(item.TrackIdx);
+                int count = anim.GetKeyframeCount();
+                for (int k = 0; k < count; k++)
+                {
+                    if (anim.GetKeyframe(k) == item.Keyframe)
+                    {
+                        state.SelectedKeyframes.Add(new SelectedKeyframe(item.TrackIdx, k));
+                        break;
+                    }
+                }
+            }
         }
     }
 }

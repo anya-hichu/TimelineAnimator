@@ -245,9 +245,18 @@ namespace TimelineAnimator.ImSequencer
                 mySequencer.FrameMax = max;
         }
 
-        public IAnimation GetAnimation(int index)
+        public IAnimation? GetAnimation(int index)
         {
+            if (index < 0 || index >= mySequencer.Animations.Count) return null;
             return mySequencer.GetAnimation(index);
+        }
+
+        public int GetSelectedKeyframeCount() => imSequencerState.SelectedKeyframes.Count;
+        public IKeyframe? GetFirstSelectedKeyframe()
+        {
+            if (imSequencerState.SelectedKeyframes.Count == 0) return null;
+            var first = imSequencerState.SelectedKeyframes.First();
+            return GetSelectedKeyframe(first.trackIndex, first.keyframeIndex);
         }
 
         public IKeyframe? GetSelectedKeyframe(int selectedEntryIndex, int keyframeIndex)
@@ -257,14 +266,30 @@ namespace TimelineAnimator.ImSequencer
             if (keyframeIndex < 0 || keyframeIndex >= anim.GetKeyframeCount()) return null;
             return anim.GetKeyframe(keyframeIndex);
         }
-        public int GetSelectedKeyframeIndex() => imSequencerState.movingKeyframeIndex;
+        public void DeleteSelectedKeyframes()
+        {
+            var toDelete = imSequencerState.SelectedKeyframes
+                .GroupBy(x => x.trackIndex)
+                .ToDictionary(g => g.Key, g => g.Select(x => x.keyframeIndex).OrderByDescending(k => k).ToList());
+
+            foreach (var kvp in toDelete)
+            {
+                var anim = mySequencer.GetAnimation(kvp.Key);
+                foreach (var kIndex in kvp.Value)
+                {
+                    anim.DeleteKeyframe(kIndex);
+                }
+            }
+            imSequencerState.SelectedKeyframes.Clear();
+        }
+
         public IAnimation? GetAnimationByName(string trackName)
         {
             return mySequencer.Animations.FirstOrDefault(anim => anim.Name == trackName);
         }
         public void ClearSelectedKeyframe()
         {
-            imSequencerState.movingKeyframeIndex = -1;
+            imSequencerState.SelectedKeyframes.Clear();
         }
     }
 }

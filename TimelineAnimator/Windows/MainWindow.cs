@@ -201,15 +201,14 @@ public class MainWindow : Window, IDisposable
         if (activeSequencer == null)
         {
             ImGui.Text("No actor selected.");
-            ImGui.TextDisabled("Click the 'Get Ktisis Actors' button");
-            ImGui.TextDisabled("(the one with the Plus icon)");
+            ImGui.TextWrapped("Please select bones in ktisis and press the plus icon to add an actor and bone track.");
 
             plugin.UpdateEasingUiKeyframe(null);
             return;
         }
 
-        int selectedKeyframeIndex = activeSequencer.GetSelectedKeyframeIndex();
-        bool isKeyframeSelected = timeline.SharedSelectedEntry != -1 && selectedKeyframeIndex != -1;
+        int selectedCount = activeSequencer.GetSelectedKeyframeCount();
+        bool isKeyframeSelected = selectedCount > 0;
 
         if (!isKeyframeSelected)
         {
@@ -225,7 +224,21 @@ public class MainWindow : Window, IDisposable
         }
         else
         {
-            var keyframe = activeSequencer.GetSelectedKeyframe(timeline.SharedSelectedEntry, selectedKeyframeIndex) as MyKeyframe;
+            if (selectedCount > 1)
+            {
+                ImGui.Text($"{selectedCount} Keyframes Selected");
+                ImGui.Separator();
+
+                if (ImGui.Button("Delete Selection"))
+                {
+                    activeSequencer.DeleteSelectedKeyframes();
+                }
+
+                // bulk easing edit could go here
+                ImGui.TextDisabled("(Select a single keyframe to edit its properties)");
+            }
+
+            var keyframe = activeSequencer.GetFirstSelectedKeyframe() as MyKeyframe;
             var anim = activeSequencer.GetAnimation(timeline.SharedSelectedEntry);
             var io = ImGui.GetIO();
 
@@ -265,8 +278,7 @@ public class MainWindow : Window, IDisposable
             {
                 if (anim != null)
                 {
-                    anim.DeleteKeyframe(selectedKeyframeIndex);
-                    activeSequencer.ClearSelectedKeyframe();
+                    activeSequencer.DeleteSelectedKeyframes();
                     timeline.SharedSelectedEntry = -1;
                 }
             }
