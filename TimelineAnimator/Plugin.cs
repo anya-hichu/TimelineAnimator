@@ -1,4 +1,6 @@
+using Dalamud.Bindings.ImGui;
 using Dalamud.Game.Command;
+using Dalamud.Interface;
 using Dalamud.Interface.Windowing;
 using Dalamud.IoC;
 using Dalamud.Plugin;
@@ -35,7 +37,24 @@ public sealed class Plugin : IDalamudPlugin
         TimelineManager = new TimelineManager(KtisisIpc);
 
         ConfigWindow = new ConfigWindow(this);
-        MainWindow = new MainWindow(this, TimelineManager);
+        MainWindow = new MainWindow(this, TimelineManager)
+        {
+            TitleBarButtons = 
+            [
+                new()
+                {
+                    Icon = FontAwesomeIcon.Cog,
+                    ShowTooltip = () => ImGui.SetTooltip("Toggle Settings Window"),
+                    Click = _ => ToggleConfigUi()
+                },
+                new()
+                {
+                    Icon = FontAwesomeIcon.QuestionCircle,
+                    ShowTooltip = () => ImGui.SetTooltip("Show Tutorial"),
+                    Click = _ => ToggleTutorialWindow()
+                }
+            ]
+        };
         TutorialWindow = new TutorialWindow(this);
         EasingWindow = new EasingWindow(this);
 

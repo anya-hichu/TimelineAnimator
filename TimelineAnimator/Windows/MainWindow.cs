@@ -76,9 +76,26 @@ public class MainWindow : Window, IDisposable
         ImGui.SameLine();
         ImGui.SetCursorPosX(rightPosX);
 
-        if (ImGuiComponents.IconButton(FontAwesomeIcon.Cog))
+        var activeSequencer = timeline.GetActiveSequencer();
+        bool hasTrackSelected = activeSequencer != null && timeline.SharedSelectedEntry != -1;
+        bool shiftDown = ImGui.GetIO().KeyShift;
+        if (!shiftDown || !hasTrackSelected) ImGui.BeginDisabled();
+        if (ImGuiComponents.IconButton(FontAwesomeIcon.MinusCircle))
         {
-            plugin.ToggleConfigUi();
+            if (activeSequencer != null && timeline.SharedSelectedEntry != -1)
+            {
+                activeSequencer.RemoveTrack(timeline.SharedSelectedEntry);
+                timeline.SharedSelectedEntry = -1;
+                timeline.GetActiveSequencer()?.ClearSelectedKeyframe();
+            }
+        }
+        if (!shiftDown || !hasTrackSelected)
+        {
+            ImGui.EndDisabled();
+            if (plugin.Configuration.ShowTooltips && ImGui.IsItemHovered(ImGuiHoveredFlags.AllowWhenDisabled))
+            {
+                ImGui.SetTooltip("Hold SHIFT to remove the selected track");
+            }
         }
         ImGui.Separator();
 
@@ -295,32 +312,6 @@ public class MainWindow : Window, IDisposable
                             (((uint)(rgba.Y * 255) & 0xFF) << 8) |
                             (((uint)(rgba.Z * 255) & 0xFF) << 16) |
                             (((uint)(rgba.W * 255) & 0xFF) << 24);
-                    }
-                }
-            }
-            ImGui.Spacing();
-            ImGui.Separator();
-            ImGui.Spacing();
-
-            if (anim != null)
-            {
-                ImGui.TextDisabled($"Track: {anim.DisplayName}");
-
-                if (!isShiftDown) ImGui.BeginDisabled();
-
-                if (ImGui.Button("Delete Track"))
-                {
-                    activeSequencer.RemoveTrack(timeline.SharedSelectedEntry);
-                    timeline.SharedSelectedEntry = -1;
-                    activeSequencer.ClearSelectedKeyframe();
-                }
-
-                if (!isShiftDown)
-                {
-                    ImGui.EndDisabled();
-                    if (plugin.Configuration.ShowTooltips && ImGui.IsItemHovered(ImGuiHoveredFlags.AllowWhenDisabled))
-                    {
-                        ImGui.SetTooltip("Hold SHIFT to delete the entire track");
                     }
                 }
             }
