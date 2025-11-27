@@ -12,6 +12,7 @@ namespace TimelineAnimator.ImSequencer
     public interface IAnimation
     {
         string Name { get; }
+        string DisplayName { get; }
         uint Color { get; }
 
         IEnumerable<IKeyframe> GetKeyframes();

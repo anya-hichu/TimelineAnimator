@@ -74,6 +74,7 @@ namespace TimelineAnimator.ImSequencer
     internal class MyAnimation : IAnimation
     {
         public string Name { get; private set; }
+        public string DisplayName { get; private set; }
         public uint Color { get; private set; }
 
         public List<MyKeyframe> Keyframes { get; private set; } = new List<MyKeyframe>();
@@ -81,6 +82,7 @@ namespace TimelineAnimator.ImSequencer
         public MyAnimation(string name, uint color)
         {
             Name = name;
+            DisplayName = BoneNameHelpers.GetDisplayName(name);
             Color = color;
         }
 

@@ -232,7 +232,7 @@ namespace TimelineAnimator.ImSequencer
                 if (canMouseClickOnRow && io.MouseDown[0] && ImGui.IsWindowHovered())
                     selectedEntry = i;
 
-                draw_list.AddText(tPos, ImGui.GetColorU32(Color_Legend_Text), animation.Name ?? $"#{i + 1}");
+                draw_list.AddText(tPos, ImGui.GetColorU32(Color_Legend_Text), animation.DisplayName ?? animation.Name ?? $"#{i + 1}");
 
                 customHeight += sequence.GetCustomHeight(i);
             }

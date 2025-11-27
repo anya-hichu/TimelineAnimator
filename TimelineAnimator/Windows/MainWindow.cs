@@ -217,7 +217,11 @@ public class MainWindow : Window, IDisposable
             ImGui.Text($"Track {timeline.SharedSelectedEntry + 1} Selected");
             if (anim != null)
             {
-                ImGui.Text($"Bone: {anim.Name}");
+                ImGui.Text($"Bone: {anim.DisplayName}");
+                if (plugin.Configuration.ShowTooltips && ImGui.IsItemHovered())
+                {
+                    ImGui.SetTooltip($"Internal Name: {anim.Name}");
+                }
             }
 
             if (keyframe != null)
