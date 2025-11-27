@@ -58,7 +58,9 @@ namespace TimelineAnimator.ImSequencer
         public float Color_Content_Lines_Alpha { get; set; } = 0.188f;
         public ImGuiCol Color_Selection { get; set; } = ImGuiCol.HeaderActive;
         public float Color_Selection_Alpha { get; set; } = 0.25f;
-        public ImGuiCol Color_Keyframe_Hover { get; set; } = ImGuiCol.TitleBgActive;
+        public ImGuiCol Color_Keyframe_Hover { get; set; } = ImGuiCol.ResizeGripActive;
+        public ImGuiCol Color_Keyframe_Selected { get; set; } = ImGuiCol.PlotLinesHovered;
+        public ImGuiCol Color_Keyframe_Default { get; set; } = ImGuiCol.TabHovered;
         public ImGuiCol Color_Playhead { get; set; } = ImGuiCol.TitleBgActive;
         public float Color_Playhead_Glow_Alpha { get; set; } = 0.314f;
         public ImGuiCol Color_Playhead_Text { get; set; } = ImGuiCol.Text;
@@ -87,7 +89,6 @@ namespace TimelineAnimator.ImSequencer
 
             var ItemHeight = 20;
 
-            var popupOpened = false;
             var sequenceCount = sequence.ItemCount;
             ImGui.BeginGroup();
 
@@ -145,8 +146,6 @@ namespace TimelineAnimator.ImSequencer
                 state.ZoomState.ViewMax = sequence.FrameMax;
                 firstFrame = sequence.FrameMin;
             }
-
-            var hasScrollBar = true;
 
             var headerSize = new Vector2(canvas_size.X, ItemHeight);
             ImGui.InvisibleButton("topBar", headerSize);
@@ -341,10 +340,13 @@ namespace TimelineAnimator.ImSequencer
                     float y = pos.Y + (ItemHeight / 2);
                     float size = 6f;
                     var keyframeRect = new ImRect(new Vector2(keyframeX - size, y - size), new Vector2(keyframeX + size, y + size));
+                    
                     bool isHovered = keyframeRect.Contains(io.MousePos);
+                    bool isSelected = i == selectedEntry && k == state.movingKeyframeIndex;
 
-                    uint baseColor = keyframe.CustomColor ?? animation.Color;
-                    uint drawColor = isHovered ? ImGui.GetColorU32(Color_Keyframe_Hover) : baseColor;
+                    uint baseColor = keyframe.CustomColor ?? ImGui.GetColorU32(Color_Keyframe_Default);
+                    uint drawColor = isSelected ? ImGui.GetColorU32(Color_Keyframe_Selected) :
+                                     isHovered ? ImGui.GetColorU32(Color_Keyframe_Hover) : baseColor;
 
                     if (keyframeX >= contentClipRectMin.X && keyframeX <= contentClipRectMax.X)
                     {

@@ -78,13 +78,11 @@ namespace TimelineAnimator.ImSequencer
 
         public List<MyKeyframe> Keyframes { get; private set; } = new List<MyKeyframe>();
 
-        public MyAnimation(string name, uint color)
+        public MyAnimation(string name)
         {
             Name = name;
             DisplayName = BoneNameHelpers.GetDisplayName(name);
-            Color = color;
         }
-
         public IEnumerable<IKeyframe> GetKeyframes() => Keyframes;
 
         public IKeyframe AddKeyframe(int frame, BoneDto? transform)
@@ -135,7 +133,7 @@ namespace TimelineAnimator.ImSequencer
 
         public void AddAnimation(string animationName)
         {
-            var newAnim = new MyAnimation(animationName, ImGui.GetColorU32(ImGuiCol.TextDisabled));
+            var newAnim = new MyAnimation(animationName);
             Animations.Add(newAnim);
         }
 
@@ -153,8 +151,7 @@ namespace TimelineAnimator.ImSequencer
         {
             var anim = Animations[index];
             var newAnim = new MyAnimation(
-                anim.Name + " (Copy)",
-                anim.Color
+                anim.Name + " (Copy)"
             );
 
             foreach (var keyframe in anim.Keyframes.Cast<MyKeyframe>())
