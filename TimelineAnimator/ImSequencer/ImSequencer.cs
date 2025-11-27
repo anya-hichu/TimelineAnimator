@@ -25,6 +25,7 @@
 // source code.
 
 using Dalamud.Bindings.ImGui;
+using Dalamud.Interface.Utility.Raii;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -387,12 +388,34 @@ namespace TimelineAnimator.ImSequencer
                         }
                     }
 
-                    if (!state.IsDragging && ImGui.IsMouseClicked(0) && isHovered)
+                    var contextPopupId = $"entry{i}Keyframe{k}ContextPopup";
+                    using (var contextPopup = ImRaii.ContextPopup(contextPopupId, ImGuiPopupFlags.MouseButtonMask))
                     {
-                        if (!new ImRect(contentClipRectMin, contentClipRectMax).Contains(io.MousePos))
-                            continue;
+                        if (contextPopup)
+                        {
+                            if (ImGui.MenuItem($"Delete###deleteEntry{i}Keyframe{k}", false, io.KeyShift))
+                            {
+                                if (state.SelectedKeyframes.Count > 0)
+                                {
+                                    foreach (var selectedKeyframe in state.SelectedKeyframes)
+                                    {
+                                        sequence.GetAnimation(selectedKeyframe.trackIndex).DeleteKeyframe(selectedKeyframe.keyframeIndex);
+                                    }
+                                }
+                                else
+                                {
+                                    animation.DeleteKeyframe(k);
+                                }
+                                state.SelectedKeyframes.Clear();
+                                ImGui.CloseCurrentPopup();
+                            }
+                            if (ImGui.IsItemHovered(ImGuiHoveredFlags.AllowWhenDisabled)) ImGui.SetTooltip("Hold SHIFT to delete");
+                        }
+                    }
 
-                        if (!state.MovingCurrentFrame)
+                    if (isHovered && new ImRect(contentClipRectMin, contentClipRectMax).Contains(io.MousePos))
+                    {
+                        if (!state.IsDragging && ImGui.IsMouseClicked(ImGuiMouseButton.Left))
                         {
                             bool isMultiSelect = io.KeyCtrl;
 
@@ -418,6 +441,12 @@ namespace TimelineAnimator.ImSequencer
                             sequence.BeginEdit(i);
                             clickedOnKeyframe = true;
                             selectedEntry = i;
+                        }
+
+                        if (ImGui.IsMouseClicked(ImGuiMouseButton.Right))
+                        {
+                            ImGui.CloseCurrentPopup();
+                            ImGui.OpenPopup(contextPopupId);
                         }
                     }
                 }
