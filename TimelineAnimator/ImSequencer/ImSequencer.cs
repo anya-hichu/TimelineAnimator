@@ -273,6 +273,7 @@ namespace TimelineAnimator.ImSequencer
 
             draw_list.PushClipRect(contentClipRectMin, contentClipRectMax, true);
 
+            int hoveredEntry = -1;
             for (int i = 0, customHeight = 0; i < sequenceCount; i++)
             {
                 var col = (i & 1) != 0 ? ImGui.GetColorU32(Color_Stripe_1) : ImGui.GetColorU32(Color_Stripe_2);
@@ -280,6 +281,12 @@ namespace TimelineAnimator.ImSequencer
                 var pos = new Vector2(contentMin.X + legendWidth, contentMin.Y + ItemHeight * i + 1 + customHeight);
                 var sz = new Vector2(contentMax.X, pos.Y + ItemHeight - 1 + localCustomHeight);
                 draw_list.AddRectFilled(pos, sz, col, 0f);
+
+                if (new ImRect(pos, sz).Contains(io.MousePos))
+                {
+                    hoveredEntry = i;
+                }
+
                 customHeight += localCustomHeight;
             }
 
@@ -397,8 +404,16 @@ namespace TimelineAnimator.ImSequencer
 
             if (clickedOnTrackArea && !clickedOnKeyframe && state.movingEntry == -1 && !state.MovingCurrentFrame)
             {
-                selectedEntry = -1;
-                state.movingKeyframeIndex = -1;
+                if (hoveredEntry >= 0)
+                {
+                    selectedEntry = hoveredEntry;
+                    state.movingKeyframeIndex = -1;
+                }
+                else
+                {
+                    selectedEntry = -1;
+                    state.movingKeyframeIndex = -1;
+                }
             }
 
             if (state.movingEntry >= 0)
