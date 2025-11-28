@@ -31,6 +31,18 @@ public class MainWindow : Window, IDisposable
 
     public void Dispose() { }
 
+    // this should hopefully block input to game
+    public override void PreDraw()
+    {
+        if (plugin.InputManager.shouldBlockGameInput)
+        {
+            var io = ImGui.GetIO();
+            io.WantCaptureKeyboard = true;
+            io.WantCaptureMouse = true;
+            io.WantTextInput = true;
+        }
+    }
+
     public override void Draw()
     {
         var style = ImGui.GetStyle();
@@ -78,8 +90,10 @@ public class MainWindow : Window, IDisposable
 
         var activeSequencer = timeline.GetActiveSequencer();
         bool hasTrackSelected = activeSequencer != null && timeline.SharedSelectedEntry != -1;
-        bool shiftDown = ImGui.GetIO().KeyShift;
-        if (!shiftDown || !hasTrackSelected) ImGui.BeginDisabled();
+
+        bool modifierHeld = plugin.InputManager.IsModifierHeld;
+
+        if (!modifierHeld|| !hasTrackSelected) ImGui.BeginDisabled();
         if (ImGuiComponents.IconButton(FontAwesomeIcon.MinusCircle))
         {
             if (activeSequencer != null && timeline.SharedSelectedEntry != -1)
@@ -89,12 +103,12 @@ public class MainWindow : Window, IDisposable
                 timeline.GetActiveSequencer()?.ClearSelectedKeyframe();
             }
         }
-        if (!shiftDown || !hasTrackSelected)
+        if (!modifierHeld || !hasTrackSelected)
         {
             ImGui.EndDisabled();
             if (plugin.Configuration.ShowTooltips && ImGui.IsItemHovered(ImGuiHoveredFlags.AllowWhenDisabled))
             {
-                ImGui.SetTooltip("Hold SHIFT to remove the selected track");
+                ImGui.SetTooltip("Hold Modifier to remove the selected track");
             }
         }
         ImGui.Separator();
@@ -139,7 +153,7 @@ public class MainWindow : Window, IDisposable
                     int currentFrame = timeline.CurrentFrame;
                     int selectedEntry = timeline.SharedSelectedEntry;
 
-                    sequencer.Draw(ref currentFrame, ref selectedEntry);
+                    sequencer.Draw(ref currentFrame, ref selectedEntry, modifierHeld);
 
                     timeline.CurrentFrame = currentFrame;
                     timeline.SharedSelectedEntry = selectedEntry;
@@ -271,8 +285,8 @@ public class MainWindow : Window, IDisposable
             }
             ImGui.Spacing();
 
-            bool isShiftDown = io.KeyShift;
-            if (!isShiftDown) ImGui.BeginDisabled();
+            bool modifierHeld = plugin.InputManager.IsModifierHeld;
+            if (!modifierHeld) ImGui.BeginDisabled();
 
             if (ImGui.Button("Delete Keyframe"))
             {
@@ -283,12 +297,12 @@ public class MainWindow : Window, IDisposable
                 }
             }
 
-            if (!isShiftDown)
+            if (!modifierHeld)
             {
                 ImGui.EndDisabled();
                 if (plugin.Configuration.ShowTooltips && ImGui.IsItemHovered(ImGuiHoveredFlags.AllowWhenDisabled))
                 {
-                    ImGui.SetTooltip("Hold SHIFT to delete");
+                    ImGui.SetTooltip("Hold Modifier to delete");
                 }
             }
 

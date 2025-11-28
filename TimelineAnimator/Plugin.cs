@@ -1,10 +1,11 @@
 using Dalamud.Bindings.ImGui;
+using Dalamud.Game.ClientState.Keys;
 using Dalamud.Game.Command;
 using Dalamud.Interface;
 using Dalamud.Interface.Windowing;
-using Dalamud.IoC;
 using Dalamud.Plugin;
 using Dalamud.Plugin.Services;
+using System;
 using TimelineAnimator.ImSequencer;
 using TimelineAnimator.Interop;
 using TimelineAnimator.Windows;
@@ -22,6 +23,7 @@ public sealed class Plugin : IDalamudPlugin
     public Configuration Configuration { get; init; }
     public readonly WindowSystem WindowSystem = new("TimelineAnimator");
     public KtisisIpc KtisisIpc { get; init; }
+    public InputManager InputManager { get; init; }
     private ConfigWindow ConfigWindow { get; init; }
     private MainWindow MainWindow { get; init; }
     private DebugWindow DebugWindow { get; init; }
@@ -34,6 +36,7 @@ public sealed class Plugin : IDalamudPlugin
         Configuration = pluginInterface.GetPluginConfig() as Configuration ?? new Configuration();
 
         KtisisIpc = new KtisisIpc();
+        InputManager = new InputManager(Configuration);
         TimelineManager = new TimelineManager(KtisisIpc);
 
         ConfigWindow = new ConfigWindow(this);
@@ -127,8 +130,19 @@ public sealed class Plugin : IDalamudPlugin
             wasInGpose = currentlyInGpose;
         }
         TimelineManager.Update((float)framework.UpdateDelta.TotalSeconds);
+        
+        if (InputManager.IsTogglePlaybackPressed())
+        {
+            TimelineManager.TogglePlay();
+        }
+
+        if (InputManager.IsAddItemPressed())
+        {
+            TimelineManager.FetchSelectedBones();
+        }
     }
 
+    
     private void OnEnterGpose()
     {
         if (Configuration.OpenInGpose)

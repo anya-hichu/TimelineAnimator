@@ -225,7 +225,7 @@ namespace TimelineAnimator.ImSequencer
             return mySequencer.Animations.Any(anim => anim.Name == trackName);
         }
 
-        public void Draw(ref int sharedCurrentFrame, ref int sharedSelectedEntry)
+        public void Draw(ref int sharedCurrentFrame, ref int sharedSelectedEntry, bool modifierHeld)
         {
             imSequencer.Sequencer(
                             SequencerName,
@@ -233,7 +233,8 @@ namespace TimelineAnimator.ImSequencer
                             mySequencer,
                             ref sharedCurrentFrame,
                             ref sharedSelectedEntry,
-                            ref firstFrame
+                            ref firstFrame,
+                            modifierHeld
                         );
         }
 

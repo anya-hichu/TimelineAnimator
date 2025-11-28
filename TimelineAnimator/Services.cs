@@ -11,6 +11,6 @@ public class Services
     [PluginService] internal static IClientState ClientState { get; private set; } = null!;
     [PluginService] internal static IPluginLog Log { get; private set; } = null!;
     [PluginService] internal static IFramework Framework { get; private set; } = null!;
-    
-    
+    [PluginService] internal static IKeyState KeyState { get; private set; } = null!;
+
 }

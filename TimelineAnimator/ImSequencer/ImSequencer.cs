@@ -92,7 +92,8 @@ namespace TimelineAnimator.ImSequencer
                                 SequenceInterface sequence,
                                 ref int currentFrame,
                                 ref int selectedEntry,
-                                ref int firstFrame)
+                                ref int firstFrame,
+                                bool modifierHeld)
         {
             var ret = false;
             var io = ImGui.GetIO();
@@ -393,7 +394,7 @@ namespace TimelineAnimator.ImSequencer
                     {
                         if (contextPopup)
                         {
-                            if (ImGui.MenuItem($"Delete###deleteEntry{i}Keyframe{k}", false, io.KeyShift))
+                            if (ImGui.MenuItem($"Delete###deleteEntry{i}Keyframe{k}", false, modifierHeld))
                             {
                                 if (state.SelectedKeyframes.Count > 0)
                                 {
@@ -409,7 +410,7 @@ namespace TimelineAnimator.ImSequencer
                                 state.SelectedKeyframes.Clear();
                                 ImGui.CloseCurrentPopup();
                             }
-                            if (ImGui.IsItemHovered(ImGuiHoveredFlags.AllowWhenDisabled)) ImGui.SetTooltip("Hold SHIFT to delete");
+                            if (ImGui.IsItemHovered(ImGuiHoveredFlags.AllowWhenDisabled)) ImGui.SetTooltip("Hold Modifier to delete");
                         }
                     }
 
@@ -417,7 +418,7 @@ namespace TimelineAnimator.ImSequencer
                     {
                         if (!state.IsDragging && ImGui.IsMouseClicked(ImGuiMouseButton.Left))
                         {
-                            bool isMultiSelect = io.KeyCtrl;
+                            bool isMultiSelect = modifierHeld;
 
                             if (isMultiSelect)
                             {
