@@ -3,6 +3,8 @@
   "Name": "TimelineAnimator",
   "Punchline": "A keyframe animator for in-game posing.",
   "Description": "A simple keyframe editor to create and play back animations using Ktisis. Use /animator to open the plugin window.",
+  "RepoUrl": "https://github.com/NanaKhide/TimelineAnimator",
+  "IconUrl": "https://raw.githubusercontent.com/NanaKhide/TimelineAnimator/master/Icon.png",
   "ApplicableVersion": "any",
   "Tags": [
     "posing",

@@ -25,3 +25,6 @@ A Dalamud plugin for creating and editing bone animations directly in-game using
 
 * XIVLauncher / Dalamud
 * [Ktisis Plugin (Testing version)](https://github.com/ktisis-tools/Ktisis) (Required for bone manipulation)
+
+## Info
+Icon made by [Vocka](https://vocka.carrd.co/)
